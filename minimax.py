@@ -14,12 +14,11 @@ class ListIndexSafe(list):
             return -1
 
 
-# TODO: Rule Check. Is 9 safe or second throw?
-
 NUM_OF_PIECES_PER_PLAYER = 5
 STEPS_IN_FUTURE = 6
 PLAYER_1_MIN = True
-VISUALIZE = False
+VISUALIZE = True
+
 
 @dataclass
 class State:
@@ -70,9 +69,13 @@ class StateList:
 
 
 class MinimaxSimulation:
+    PLACE_ROSETTE = 3
+    PLACE_START = -1
+    PLACE_FINISH = -2
 
     def __init__(self) -> None:
         # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
+        # Rule clarification: No safe spot. Second throw on every rosette.
         # States:
         # 0 -> No player on this field
         # 1 -> Player1 on this field
@@ -80,7 +83,9 @@ class MinimaxSimulation:
         # 3 -> Rosette (another throw)
         # 4 = 3 + 1 -> Player 1 on rosette
         # 5 = 3 + 2 -> Player 2 on rosette
-        self.game_board = [3, 0, 0, 0, 3, 0, 0, 0, 0, 3, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0]
+        self.game_board = [self.PLACE_ROSETTE, 0, 0, 0, self.PLACE_ROSETTE, 0, 0, 0, 0,
+                           self.PLACE_ROSETTE, 0, 0, 0, 0, self.PLACE_ROSETTE, 0, 0, 0,
+                           self.PLACE_ROSETTE, 0]
 
         # Indices of game_board path for both players
         self.path_1 = ListIndexSafe([3, 2, 1, 0, 6, 7, 8, 9, 10, 11, 12, 13, 5, 4])
@@ -99,7 +104,7 @@ class MinimaxSimulation:
         # Indices of game_board places for both players
         # -1 -> Start
         # -2 -> Finish
-        places_1 = places_2 = [-1] * NUM_OF_PIECES_PER_PLAYER
+        places_1 = places_2 = [self.PLACE_START] * NUM_OF_PIECES_PER_PLAYER
         # Number of pieces in finish for both players
         score_1 = score_2 = 0
         # Start state
@@ -119,7 +124,6 @@ class MinimaxSimulation:
 
     def simulate_step(self, current_player: int, other_player: int, current_state: State, dice: int,
                       step: int) -> None:
-        # TODO: Add second throw on rosette
 
         print(f"Position: {current_state.pos} - Step: {step}")
         print(f"Current player: {current_player}, other_player: {other_player}")
@@ -127,75 +131,115 @@ class MinimaxSimulation:
         print(f"Places 1: {current_state.places_1} - Places 2: {current_state.places_2}")
         print(f"Score 1: {current_state.score_1} - Score 2: {current_state.score_2}")
 
-        scores: List[int] = self.player_based_list(current_state.score_1, current_state.score_2)
-        score = scores[current_player]
+        scores = self.player_based_list(current_state.score_1, current_state.score_2)
+        game_board_current = current_state.game_board
+        places_current_player = \
+            self.player_based_list(current_state.places_1, current_state.places_2)[current_player]
 
-        if score == NUM_OF_PIECES_PER_PLAYER:
+        # ----- Check Win Condition ----- #
+
+        if scores[current_player] == NUM_OF_PIECES_PER_PLAYER:
             print("Win - Keine Ahnung was jetzt")
             sys.exit(0)
 
+        # ----- New State variables ----- #
+
+        scores_new = scores.copy()
+        game_board_new = game_board_current.copy()
+        places_new = self.player_based_list(current_state.places_1.copy(),
+                                            current_state.places_2.copy())
+        step_new = step + 1
+        parent_pos = current_state.pos
+
+        # ----- Check Dice == 0 ----- #
+
         if dice == 0:
             # No movement
-            state_new = State(current_state.game_board.copy(), current_state.score_1,
-                              current_state.score_2, current_state.places_1.copy(),
-                              current_state.places_2.copy(), step + 1, current_state.pos)
+
+            state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
+                              places_new[2], step_new, parent_pos)
             state_new = self.state_list.add_new_state(state_new)
             current_state.children = [state_new.pos]
 
             return
 
+        # ----- Path variable ----- #
+
         path: ListIndexSafe[int] = self.paths[current_player]
-        piece_places: List[List[int]] = self.player_based_list(current_state.places_1,
-                                                               current_state.places_2)
 
-        for piece_index, piece_place in enumerate(piece_places[current_player]):
-            if piece_place == -2:
+        # ----- Creation of moves for every piece ----- #
+
+        for piece_index, place_current in enumerate(places_current_player):
+
+            # ----- New State variables ----- #
+
+            scores_new = scores.copy()
+            game_board_new = game_board_current.copy()
+            places_new = self.player_based_list(current_state.places_1.copy(),
+                                                current_state.places_2.copy())
+
+            if place_current == self.PLACE_FINISH:
                 # Piece is in finish
+
                 continue
 
-            next_place_path_index = path.index_safe(piece_place) + dice
-            if next_place_path_index >= len(path):
+            # index of next path position in path list
+            place_new_path_index = path.index_safe(place_current) + dice
+            if place_new_path_index >= len(path):
                 # Move cannot be done, because the piece has to be finished perfectly
+
                 continue
 
-            if next_place_path_index == len(path):
-                # Piece is in finish
-                score += 1
+            if place_new_path_index == len(path):
+                # Piece is in finish with next move
 
-                game_board_new = current_state.game_board.copy()
-                game_board_new[piece_place] -= current_player
+                scores_new[current_player] += 1
 
-                next_place = -2
+                # Piece moves from current place to finish
+                game_board_new[place_current] -= current_player
+                places_new[current_player][piece_index] = self.PLACE_FINISH
             else:
-                # Piece has not finished
-                next_place = path[next_place_path_index]
+                # Piece has not finished with next move
 
-                # Check if some piece is already on this field
-                next_place_value = current_state.game_board[next_place]
-                if next_place_value - current_player in [0, 3]:
-                    # On the field is already a piece of the current_player
+                # ID of next place
+                place_new = path[place_new_path_index]
+                # Current value of the new place
+                place_new_current_value = game_board_current[place_new]
+
+                if place_new_current_value - current_player in [0, self.PLACE_ROSETTE]:
+                    # Move cannot be done, on the field is already a piece of the current_player,
+
                     continue
 
-                game_board_new = current_state.game_board.copy()
-                if next_place_value in [0, 3]:
+                if place_new_current_value - other_player == 0:
+                    # Other player will be caught and returned to start
+
+                    # current player moves from current place to new place
+                    game_board_new[place_current] -= current_player
+                    game_board_new[place_new] = current_player
+                    places_new[current_player][piece_index] = place_new
+
+                    # other player piece on new place moves to start
+                    game_board_new[place_new] -= other_player
+                    places_new[other_player][
+                        place_new[other_player].index(place_new)] = self.PLACE_START
+
+                elif place_new_current_value in [0, self.PLACE_ROSETTE]:
                     # Field is free
-                    if piece_place != -1:
+                    # TODO: Add second throw on rosette
+
+                    if place_current != self.PLACE_START:
                         # Piece is already in the game
-                        game_board_new[piece_place] = 0
 
-                    game_board_new[next_place] += current_player
-                else:
-                    # Other player is on this field
-                    game_board_new[piece_place] -= current_player
-                    game_board_new[next_place] -= other_player
-                    game_board_new[next_place] += current_player
+                        game_board_new[place_current] = 0
 
-            piece_places_new = self.player_based_list(piece_places[1].copy(),
-                                                      piece_places[2].copy())
-            piece_places_new[current_player][piece_index] = next_place
+                    game_board_new[place_new] += current_player
+                    places_new[current_player][piece_index] = place_new
 
-            state_new = State(game_board_new, scores[1], scores[2], piece_places_new[1],
-                              piece_places_new[2], step + 1, current_state.pos)
+            # ----- New State creation ----- #
+
+            state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
+                              places_new[2], step_new, parent_pos)
             state_new = self.state_list.add_new_state(state_new)
             current_state.children.append(state_new.pos)
 
