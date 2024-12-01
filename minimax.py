@@ -222,7 +222,7 @@ class MinimaxSimulation:
                     # other player piece on new place moves to start
                     game_board_new[place_new] -= other_player
                     places_new[other_player][
-                        place_new[other_player].index(place_new)] = self.PLACE_START
+                        places_new[other_player].index(place_new)] = self.PLACE_START
 
                 elif place_new_current_value in [0, self.PLACE_ROSETTE]:
                     # Field is free
