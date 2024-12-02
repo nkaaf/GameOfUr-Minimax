@@ -15,9 +15,9 @@ class ListIndexSafe(list):
 
 
 NUM_OF_PIECES_PER_PLAYER = 5
-STEPS_IN_FUTURE = 6
+STEPS_IN_FUTURE = 8
 PLAYER_1_MIN = True
-VISUALIZE = True
+VISUALIZE = False
 
 
 @dataclass
@@ -144,10 +144,6 @@ class MinimaxSimulation:
 
         # ----- New State variables ----- #
 
-        scores_new = scores.copy()
-        game_board_new = game_board_current.copy()
-        places_new = self.player_based_list(current_state.places_1.copy(),
-                                            current_state.places_2.copy())
         step_new = step + 1
         parent_pos = current_state.pos
 
@@ -155,6 +151,11 @@ class MinimaxSimulation:
 
         if dice == 0:
             # No movement
+
+            scores_new = scores.copy()
+            game_board_new = game_board_current.copy()
+            places_new = self.player_based_list(current_state.places_1.copy(),
+                                                current_state.places_2.copy())
 
             state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
                               places_new[2], step_new, parent_pos)
@@ -190,6 +191,7 @@ class MinimaxSimulation:
 
                 continue
 
+            second_throw = False
             if place_new_path_index == len(path):
                 # Piece is in finish with next move
 
@@ -216,7 +218,7 @@ class MinimaxSimulation:
 
                     # current player moves from current place to new place
                     game_board_new[place_current] -= current_player
-                    game_board_new[place_new] = current_player
+                    game_board_new[place_new] += current_player
                     places_new[current_player][piece_index] = place_new
 
                     # other player piece on new place moves to start
@@ -226,7 +228,9 @@ class MinimaxSimulation:
 
                 elif place_new_current_value in [0, self.PLACE_ROSETTE]:
                     # Field is free
-                    # TODO: Add second throw on rosette
+
+                    if place_new_current_value == self.PLACE_ROSETTE:
+                        second_throw = True
 
                     if place_current != self.PLACE_START:
                         # Piece is already in the game
@@ -242,6 +246,13 @@ class MinimaxSimulation:
                               places_new[2], step_new, parent_pos)
             state_new = self.state_list.add_new_state(state_new)
             current_state.children.append(state_new.pos)
+
+            # ----- Second throw if on Rosette ----- #
+
+            if second_throw:
+                dice_second = self.throw_dices(1)[0]
+
+                self.simulate_step(current_player, other_player, state_new, dice_second, step + 1)
 
         print()
 
