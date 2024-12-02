@@ -18,6 +18,7 @@ NUM_OF_PIECES_PER_PLAYER = 5
 STEPS_IN_FUTURE = 8
 PLAYER_1_MIN = True
 VISUALIZE = False
+ROSETTE_9_IS_SAFE = True
 
 
 @dataclass
@@ -70,6 +71,7 @@ class StateList:
 
 class MinimaxSimulation:
     PLACE_ROSETTE = 3
+    PLACE_ROSETTE_SAFE = 6 if ROSETTE_9_IS_SAFE else PLACE_ROSETTE
     PLACE_START = -1
     PLACE_FINISH = -2
 
@@ -84,7 +86,7 @@ class MinimaxSimulation:
         # 4 = 3 + 1 -> Player 1 on rosette
         # 5 = 3 + 2 -> Player 2 on rosette
         self.game_board = [self.PLACE_ROSETTE, 0, 0, 0, self.PLACE_ROSETTE, 0, 0, 0, 0,
-                           self.PLACE_ROSETTE, 0, 0, 0, 0, self.PLACE_ROSETTE, 0, 0, 0,
+                           self.PLACE_ROSETTE_SAFE, 0, 0, 0, 0, self.PLACE_ROSETTE, 0, 0, 0,
                            self.PLACE_ROSETTE, 0]
 
         # Indices of game_board path for both players
@@ -208,10 +210,17 @@ class MinimaxSimulation:
                 # Current value of the new place
                 place_new_current_value = game_board_current[place_new]
 
-                if place_new_current_value - current_player in [0, self.PLACE_ROSETTE]:
+                if place_new_current_value - current_player in [0, self.PLACE_ROSETTE,
+                                                                self.PLACE_ROSETTE_SAFE]:
                     # Move cannot be done, on the field is already a piece of the current_player,
 
                     continue
+
+                if ROSETTE_9_IS_SAFE:
+                    if place_new_current_value - other_player == self.PLACE_ROSETTE_SAFE:
+                        # Move cannot be done, because this rosette is a safe spot for the other player
+
+                        continue
 
                 if place_new_current_value - other_player == 0:
                     # Other player will be caught and returned to start
