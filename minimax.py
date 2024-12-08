@@ -14,10 +14,12 @@ class ListIndexSafe(list):
             return -1
 
 
+# Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
+# Rules from Tom Scott vs. Finkel
 NUM_OF_PIECES_PER_PLAYER = 5
 STEPS_IN_FUTURE = 8
 PLAYER_1_MIN = True
-VISUALIZE = False
+VISUALIZE = True
 ROSETTE_9_IS_SAFE = True
 
 
@@ -76,8 +78,6 @@ class MinimaxSimulation:
     PLACE_FINISH = -2
 
     def __init__(self) -> None:
-        # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
-        # Rule clarification: No safe spot. Second throw on every rosette.
         # States:
         # 0 -> No player on this field
         # 1 -> Player1 on this field
@@ -138,12 +138,6 @@ class MinimaxSimulation:
         places_current_player = \
             self.player_based_list(current_state.places_1, current_state.places_2)[current_player]
 
-        # ----- Check Win Condition ----- #
-
-        if scores[current_player] == NUM_OF_PIECES_PER_PLAYER:
-            print("Win - Keine Ahnung was jetzt")
-            sys.exit(0)
-
         # ----- New State variables ----- #
 
         step_new = step + 1
@@ -188,7 +182,7 @@ class MinimaxSimulation:
 
             # index of next path position in path list
             place_new_path_index = path.index_safe(place_current) + dice
-            if place_new_path_index >= len(path):
+            if place_new_path_index > len(path):
                 # Move cannot be done, because the piece has to be finished perfectly
 
                 continue
@@ -235,7 +229,7 @@ class MinimaxSimulation:
                     places_new[other_player][
                         places_new[other_player].index(place_new)] = self.PLACE_START
 
-                elif place_new_current_value in [0, self.PLACE_ROSETTE]:
+                elif place_new_current_value in [0, self.PLACE_ROSETTE, self.PLACE_ROSETTE_SAFE]:
                     # Field is free
 
                     if place_new_current_value == self.PLACE_ROSETTE:
@@ -244,7 +238,7 @@ class MinimaxSimulation:
                     if place_current != self.PLACE_START:
                         # Piece is already in the game
 
-                        game_board_new[place_current] = 0
+                        game_board_new[place_current] -= current_player
 
                     game_board_new[place_new] += current_player
                     places_new[current_player][piece_index] = place_new
@@ -264,6 +258,12 @@ class MinimaxSimulation:
                 self.simulate_step(current_player, other_player, state_new, dice_second, step + 1)
 
         print()
+
+    @staticmethod
+    def check_win(score_current_player: int):
+        if score_current_player == NUM_OF_PIECES_PER_PLAYER:
+            print("Win - Keine Ahnung was jetzt")
+            sys.exit(0)
 
     def visualize(self) -> None:
         graph = graphviz.Graph()
@@ -303,6 +303,12 @@ class MinimaxSimulation:
 
                     if next_state is not None:
                         current_state = next_state
+
+                    if current_state is not None:
+                        if current_player == 1:
+                            self.check_win(current_state.score_1)
+                        else:
+                            self.check_win(current_state.score_2)
 
             next_state = None
             while next_state is None and current_state is not None and current_state.child_iter <= len(
