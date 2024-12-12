@@ -17,7 +17,7 @@ class ListIndexSafe(list):
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
 NUM_OF_PIECES_PER_PLAYER = 5
-STEPS_IN_FUTURE = 8
+STEPS_IN_FUTURE = 3
 PLAYER_1_MIN = True
 VISUALIZE = True
 ROSETTE_9_IS_SAFE = True
@@ -38,7 +38,10 @@ class State:
     score_2: int
     places_1: List[int]
     places_2: List[int]
-    parent_pos: Optional[int] = field(default=None)
+    current_player: int
+    other_player: int
+    second_throw: bool = field(default=False)
+    parent_pos: Optional[int] = field(default=0)
     pos: int = field(init=False)
     children: List[int] = field(init=False, default_factory=list)
     child_iter: int = field(init=False, default=-1)
@@ -108,9 +111,7 @@ class MinimaxSimulation:
         self.paths = self.player_based_list(self.path_1, self.path_2)
 
         # Version1: Calculate steps before the simulation
-        self.dices_1 = self.throw_dices(STEPS_IN_FUTURE // 2)
-        self.dices_2 = self.throw_dices(STEPS_IN_FUTURE // 2)
-        self.dices = self.player_based_list(self.dices_1, self.dices_2)
+        self.dices = self.throw_dices(STEPS_IN_FUTURE)
 
         self.state_list = StateList()
 
@@ -126,7 +127,7 @@ class MinimaxSimulation:
         state = self.game_board
 
         self.start_state = self.state_list.add_new_state(
-            State(state, score_1, score_2, places_1, places_2, 0))
+            State(state, score_1, score_2, places_1, places_2, 1, 2))
 
     @staticmethod
     def throw_dices(n: int) -> numpy.ndarray[int]:
@@ -181,14 +182,17 @@ class MinimaxSimulation:
 
         return points_total
 
-    def simulate_step(self, current_player: int, other_player: int, current_state: State, dice: int,
-                      states: List[State] = []) -> List[State]:
+    def simulate_step(self, current_state: State, dice: int) -> None:
 
         print(f"Position: {current_state.pos}")
-        print(f"Current player: {current_player}, other_player: {other_player}")
+        print(f"Current player: {current_state.current_player}, other_player: {current_state.other_player}")
+        print(f"Is Second Throw: {current_state.second_throw}")
         print(f"Board state: {current_state.game_board} - Dice: {dice}")
         print(f"Places 1: {current_state.places_1} - Places 2: {current_state.places_2}")
         print(f"Score 1: {current_state.score_1} - Score 2: {current_state.score_2}")
+
+        current_player = current_state.current_player
+        other_player = current_state.other_player
 
         scores = self.player_based_list(current_state.score_1, current_state.score_2)
         game_board_current = current_state.game_board
@@ -210,7 +214,7 @@ class MinimaxSimulation:
                                                 current_state.places_2.copy())
 
             state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
-                              places_new[2], parent_pos)
+                              places_new[2], other_player, current_player, parent_pos=parent_pos)
             state_new = self.state_list.add_new_state(state_new)
             current_state.children = [state_new.pos]
 
@@ -301,24 +305,17 @@ class MinimaxSimulation:
 
             # ----- New State creation ----- #
 
-            state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
-                              places_new[2], parent_pos)
+            if second_throw:
+                state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
+                                  places_new[2], current_player, other_player, second_throw, parent_pos)
+            else:
+                state_new = State(game_board_new, scores_new[1], scores_new[2], places_new[1],
+                                  places_new[2], other_player, current_player, second_throw, parent_pos)
+
             state_new = self.state_list.add_new_state(state_new)
             current_state.children.append(state_new.pos)
 
-            states.append(current_state)
-
-            # ----- Second throw if on Rosette ----- #
-
-            if second_throw:
-                dice_second = self.throw_dices(1)[0]
-
-                self.simulate_step(current_player, other_player, state_new, dice_second, states)
-
         print()
-
-        # TODO: States list call-by-reference/value testing
-        return states
 
     @staticmethod
     def check_win(score_current_player: int):
@@ -339,25 +336,21 @@ class MinimaxSimulation:
         graph.view()
 
     def start(self) -> None:
-        assert STEPS_IN_FUTURE % 2 == 0, "STEPS_IN_FUTURE must be even"
-
-        assert len(self.dices_1) == len(self.dices_2) and len(
-            self.dices_1) * 2 == STEPS_IN_FUTURE, "Programming Error!"
+        assert len(self.dices) == STEPS_IN_FUTURE, "Programming Error!"
 
         next_state = current_state = self.start_state
 
+        current_step = START_STEP
+
         while current_state is not None and next_state is not None:
 
-            for step in range(START_STEP, STEPS_IN_FUTURE):
-                current_player = 2 if not (step % 2 == 0) else 1
-                other_player = 2 if current_player == 1 else 1
+            for step in range(current_step, STEPS_IN_FUTURE):
+                dice = self.dices[step]
 
-                dice = self.dices[current_player][step // 2]
 
-                states = self.simulate_step(current_player, other_player, current_state, dice)
-                #for state in states:
-                #    nutzen = self.evaluation(state, current_player, other_player)
-                #    print(nutzen)
+                print(step)
+                self.simulate_step(current_state, dice)
+                #self.evaluation(state, current_player, other_player)
 
                 if step != STEPS_IN_FUTURE - 1:
                     # Get next child
@@ -369,14 +362,17 @@ class MinimaxSimulation:
                         current_state = next_state
 
                     if current_state is not None:
-                        if current_player == 1:
+                        if current_state.current_player == 1:
                             self.check_win(current_state.score_1)
                         else:
                             self.check_win(current_state.score_2)
 
+            current_step = STEPS_IN_FUTURE
+
             next_state = None
             while next_state is None and current_state is not None and current_state.child_iter <= len(
                     current_state.children):
+                current_step -= 1
                 current_state = self.state_list.get_parent(current_state)
                 if current_state is not None:
                     next_state = self.state_list.get_next_child(current_state)

@@ -22,15 +22,14 @@ class MinimaxTest(unittest.TestCase):
         self.places_default = [START] * NUM_OF_PIECES_PER_PLAYER
 
         self.score_default = 0
-        self.step_default = 0
         self.state_default = self.create_state(self.game_board_default.copy(), self.score_default,
                                                self.score_default, self.places_default.copy(),
-                                               self.places_default.copy(), self.step_default)
+                                               self.places_default.copy(), 1, 2)
 
     @staticmethod
     def create_state(game_board: List[int], score_1: int, score_2: int, places_1: List[int],
-                     places_2: List[int], step: int) -> State:
-        return State(game_board, score_1, score_2, places_1, places_2, step)
+                     places_2: List[int], current_player: int, other_player: int, second_throw: bool = False) -> State:
+        return State(game_board, score_1, score_2, places_1, places_2, current_player, other_player, second_throw)
 
     def add_state(self, state: State) -> State:
         return self.sim.state_list.add_new_state(state)
@@ -46,8 +45,12 @@ class MinimaxTest(unittest.TestCase):
 
         expected_place = START
 
-        current_state = self.add_state(self.state_default)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        state = self.state_default
+        state.current_player = current_player
+        state.other_player = other_player
+
+        current_state = self.add_state(state)
+        self.sim.simulate_step(current_state, dice)
         simulated_step = self.get_simulated_state(current_state)
 
         self.assertEqual(simulated_step.game_board, self.game_board_default)
@@ -69,8 +72,12 @@ class MinimaxTest(unittest.TestCase):
 
         expected_place = 3
 
-        current_state = self.add_state(self.state_default)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        state = self.state_default
+        state.current_player = current_player
+        state.other_player = other_player
+
+        current_state = self.add_state(state)
+        self.sim.simulate_step(current_state, dice)
         simulated_step = self.get_simulated_state(current_state)
 
         self.assertEqual(
@@ -100,11 +107,17 @@ class MinimaxTest(unittest.TestCase):
 
         expected_place_first = 14
 
-        current_state = self.add_state(self.state_default)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        state = self.state_default
+        state.current_player = current_player
+        state.other_player = other_player
+
+        current_state = self.add_state(state)
+        self.sim.simulate_step(current_state, dice)
         simulated_step = self.get_simulated_state(current_state)
 
         # Evaluation first throw
+
+        self.assertTrue(simulated_step.second_throw)
 
         self.assertEqual(simulated_step.game_board[expected_place_first] - self.game_board_default[
             expected_place_first], current_player)
@@ -122,28 +135,6 @@ class MinimaxTest(unittest.TestCase):
 
         self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
 
-        # Evaluation second throw
-
-        expected_place_second = 8
-
-        simulated_step = self.get_simulated_state(simulated_step)
-
-        self.assertEqual(simulated_step.game_board[expected_place_second] - self.game_board_default[
-            expected_place_second], current_player)
-        self.assertEqual(simulated_step.score_1, 0)
-        self.assertEqual(simulated_step.score_2, 0)
-
-        places_2_new = self.places_default.copy()
-        places_2_new[0] = expected_place_second
-        self.assertEqual(simulated_step.places_1, self.places_default)
-        self.assertEqual(simulated_step.places_2, places_2_new)
-
-        changed_board = simulated_step.game_board.copy()
-        changed_board[expected_place_second] -= current_player
-        self.assertEqual(changed_board, self.game_board_default)
-
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
-
     def test3(self):
         """Player 1 has one piece which goes directly into finish."""
         current_player = 1
@@ -155,9 +146,11 @@ class MinimaxTest(unittest.TestCase):
         state = dataclasses.replace(self.state_default)
         state.game_board[5] += current_player
         state.places_1[0] = 5
+        state.current_player = current_player
+        state.other_player = other_player
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        self.sim.simulate_step(current_state, dice)
         simulated_step = self.get_simulated_state(current_state)
 
         self.assertEqual(simulated_step.game_board[5], self.game_board_default[5])
@@ -182,10 +175,11 @@ class MinimaxTest(unittest.TestCase):
         state = dataclasses.replace(self.state_default)
         state.game_board[5] += current_player
         state.places_1[0] = 5
+        state.current_player = current_player
+        state.other_player = other_player
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
-        self.get_simulated_state(current_state)
+        self.sim.simulate_step(current_state, dice)
 
         self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
 
@@ -197,9 +191,11 @@ class MinimaxTest(unittest.TestCase):
 
         state = dataclasses.replace(self.state_default)
         state.places_1[0] = FINISH
+        state.current_player = current_player
+        state.other_player = other_player
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        self.sim.simulate_step(current_state, dice)
         self.get_simulated_state(current_state)
 
         self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
@@ -215,10 +211,11 @@ class MinimaxTest(unittest.TestCase):
         state.game_board[2] += current_player
         state.places_1[0] = 2
         state.places_1[1] = 1
+        state.current_player = current_player
+        state.other_player = other_player
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
-        self.get_simulated_state(current_state)
+        self.sim.simulate_step(current_state, dice)
 
         self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
 
@@ -233,10 +230,11 @@ class MinimaxTest(unittest.TestCase):
         state.game_board[9] += other_player
         state.places_1[0] = 8
         state.places_2[0] = 9
+        state.current_player = current_player
+        state.other_player = other_player
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
-        self.get_simulated_state(current_state)
+        self.sim.simulate_step(current_state, dice)
 
         self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
 
@@ -249,11 +247,13 @@ class MinimaxTest(unittest.TestCase):
         state = dataclasses.replace(self.state_default)
         state.game_board[8] += current_player
         state.places_1[0] = 8
+        state.current_player = current_player
+        state.other_player = other_player
 
         expected_place = 9
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        self.sim.simulate_step(current_state, dice)
         simulated_step = self.get_simulated_state(current_state)
 
         self.assertEqual(
@@ -284,12 +284,14 @@ class MinimaxTest(unittest.TestCase):
         state.game_board[8] += other_player
         state.places_1[0] = 7
         state.places_2[0] = 8
+        state.current_player = current_player
+        state.other_player = other_player
 
         expected_place_1 = 8
         expected_place_2 = START
 
         current_state = self.add_state(state)
-        self.sim.simulate_step(current_player, other_player, current_state, dice, self.step_default)
+        self.sim.simulate_step(current_state, dice)
         simulated_step =self.get_simulated_state(current_state)
 
         self.assertEqual(
