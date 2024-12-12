@@ -5,6 +5,22 @@ from typing import Optional, List
 import graphviz
 import numpy
 
+from pathlib import  Path
+
+output_file = Path() / "output.txt"
+output_file.open("w").write("")
+output_file_eval = Path() / "output_eval.txt"
+output_file_eval.open("w").write("")
+
+def print_out(text = "") -> None:
+    text = str(text)
+    text += "\n"
+    output_file.open("a").write(text)
+
+def print_eval(text="") -> None:
+    text = str(text)
+    text += "\n"
+    output_file_eval.open("a").write(text)
 
 class ListIndexSafe(list):
     def index_safe(self, *args, **kwargs) -> int:
@@ -17,9 +33,9 @@ class ListIndexSafe(list):
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
 NUM_OF_PIECES_PER_PLAYER = 5
-STEPS_IN_FUTURE = 3
+STEPS_IN_FUTURE = 8
 PLAYER_1_MIN = True
-VISUALIZE = True
+VISUALIZE = False
 ROSETTE_9_IS_SAFE = True
 START_STEP = 0
 
@@ -41,10 +57,11 @@ class State:
     current_player: int
     other_player: int
     second_throw: bool = field(default=False)
-    parent_pos: Optional[int] = field(default=0)
+    parent_pos: int = field(default=0)
     pos: int = field(init=False)
     children: List[int] = field(init=False, default_factory=list)
     child_iter: int = field(init=False, default=-1)
+    score: float = field(init=False, default=0)
 
 
 class StateList:
@@ -80,6 +97,9 @@ class StateList:
         except IndexError:
             return None
 
+    def get(self, index: int) -> State:
+        return self.states[index]
+
 
 class MinimaxSimulation:
     PLACE_ROSETTE = 3
@@ -88,7 +108,7 @@ class MinimaxSimulation:
     PLACE_FINISH = -2
 
     # evaluation
-    base_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, EVAL_POINT_FINISH, EVAL_POINT_FINISH]
+    base_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, EVAL_POINT_FINISH, EVAL_POINT_START]
     rosette_bonus = [value * EVAL_MULTIPLIER_ROSETTE for value in
                      [1 / 16, 1 / 4, 3 / 8, 1, 1 / 16, 1 / 4, 3 / 8, 1, 0, 1 / 16, 1 / 4, 3 / 8, 1, 0, 0]]
     kill_distances_multiplier = [None, 1 / 4, 3 / 8, 1 / 4, 1 / 16]
@@ -138,7 +158,10 @@ class MinimaxSimulation:
     def player_based_list(e1, e2) -> list:
         return [None, e1, e2]
 
-    def evaluation(self, state: State, current_player: int, other_player: int) -> float:
+    def evaluation(self, state: State) -> float:
+        current_player = state.current_player
+        other_player = state.other_player
+
         places = MinimaxSimulation.player_based_list(state.places_1, state.places_2)
         paths = MinimaxSimulation.player_based_list(self.path_1, self.path_2)
 
@@ -150,16 +173,20 @@ class MinimaxSimulation:
 
         points_total = 0
         for piece_place_current in places_current_player:
+
+            if piece_place_current in [MinimaxSimulation.PLACE_START, MinimaxSimulation.PLACE_FINISH]:
+                path_index_current = piece_place_current
+            else:
+                path_index_current = paths_current_player.index(piece_place_current)
+
             # self.path_points + (self.rosette_multiplier * POINT_ROSETTE_MULTIPLIER)
             # ==
             # self.path_points + self.rosette_bonus
-            points_total += MinimaxSimulation.base_points[piece_place_current] + MinimaxSimulation.rosette_bonus[
-                piece_place_current]
+            points_total += MinimaxSimulation.base_points[path_index_current] + MinimaxSimulation.rosette_bonus[
+                path_index_current]
 
-            if piece_place_current in [MinimaxSimulation.PLACE_START, MinimaxSimulation.PLACE_FINISH]:
+            if path_index_current in [MinimaxSimulation.PLACE_START, MinimaxSimulation.PLACE_FINISH]:
                 continue
-
-            path_index_current = paths_current_player.index(piece_place_current)
 
             # Killable
 
@@ -184,12 +211,12 @@ class MinimaxSimulation:
 
     def simulate_step(self, current_state: State, dice: int) -> None:
 
-        print(f"Position: {current_state.pos}")
-        print(f"Current player: {current_state.current_player}, other_player: {current_state.other_player}")
-        print(f"Is Second Throw: {current_state.second_throw}")
-        print(f"Board state: {current_state.game_board} - Dice: {dice}")
-        print(f"Places 1: {current_state.places_1} - Places 2: {current_state.places_2}")
-        print(f"Score 1: {current_state.score_1} - Score 2: {current_state.score_2}")
+        print_out(f"Position: {current_state.pos}")
+        print_out(f"Current player: {current_state.current_player}, other_player: {current_state.other_player}")
+        print_out(f"Is Second Throw: {current_state.second_throw}")
+        print_out(f"Board state: {current_state.game_board} - Dice: {dice}")
+        print_out(f"Places 1: {current_state.places_1} - Places 2: {current_state.places_2}")
+        print_out(f"Score 1: {current_state.score_1} - Score 2: {current_state.score_2}")
 
         current_player = current_state.current_player
         other_player = current_state.other_player
@@ -279,6 +306,8 @@ class MinimaxSimulation:
                 if place_new_current_value - other_player == 0:
                     # Other player will be caught and returned to start
 
+                    print_out("CAUGHT")
+
                     # current player moves from current place to new place
                     game_board_new[place_current] -= current_player
                     game_board_new[place_new] += current_player
@@ -315,19 +344,19 @@ class MinimaxSimulation:
             state_new = self.state_list.add_new_state(state_new)
             current_state.children.append(state_new.pos)
 
-        print()
+        print_out()
 
     @staticmethod
     def check_win(score_current_player: int):
         if score_current_player == NUM_OF_PIECES_PER_PLAYER:
-            print("Win - Keine Ahnung was jetzt")
+            print_out("Win - Keine Ahnung was jetzt")
             sys.exit(0)
 
     def visualize(self) -> None:
         graph = graphviz.Graph()
 
         for state in self.state_list:
-            graph.node(str(state.pos), str(state.pos))
+            graph.node(str(state.pos), f"{state.pos} - Score: {state.score}")
 
         for state in self.state_list:
             for child in state.children:
@@ -347,10 +376,14 @@ class MinimaxSimulation:
             for step in range(current_step, STEPS_IN_FUTURE):
                 dice = self.dices[step]
 
+                print_out(step)
 
-                print(step)
                 self.simulate_step(current_state, dice)
-                #self.evaluation(state, current_player, other_player)
+
+                for child in [self.state_list.get(index) for index in current_state.children]:
+                    score = self.evaluation(child)
+                    print_eval(f"{step},{score}")
+                    child.score = score
 
                 if step != STEPS_IN_FUTURE - 1:
                     # Get next child
