@@ -1,314 +1,161 @@
 import dataclasses
 import unittest
 from typing import List
-from unittest import mock
 
-from minimax import MinimaxSimulation, State, NUM_OF_PIECES_PER_PLAYER
-
-ROSETTE = MinimaxSimulation.PLACE_ROSETTE
-ROSETTE_SAFE = MinimaxSimulation.PLACE_ROSETTE_SAFE
-
-START = MinimaxSimulation.PLACE_START
-FINISH = MinimaxSimulation.PLACE_FINISH
+from minimax import MinimaxSimulation, State, NUM_OF_PIECES_PER_PLAYER, PLACE_ROSETTE_SAFE, \
+    PLACE_START, PLACE_ROSETTE, PLACE_FINISH
 
 
 class MinimaxTest(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.game_board_default = [ROSETTE, 0, 0, 0, ROSETTE, 0, 0, 0, 0, ROSETTE_SAFE, 0, 0, 0, 0,
-                                   ROSETTE, 0, 0, 0, ROSETTE, 0]
         self.sim = MinimaxSimulation()
 
-        self.places_default = [START] * NUM_OF_PIECES_PER_PLAYER
-
+        self.game_board_default = self.sim.game_board.copy()
         self.score_default = 0
-        self.state_default = self.create_state(self.game_board_default.copy(), self.score_default,
-                                               self.score_default, self.places_default.copy(),
-                                               self.places_default.copy(), 1, 2)
+        self.pieces_default = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
 
-    @staticmethod
-    def create_state(game_board: List[int], score_1: int, score_2: int, places_1: List[int],
-                     places_2: List[int], current_player: int, other_player: int, second_throw: bool = False) -> State:
-        return State(game_board, score_1, score_2, places_1, places_2, current_player, other_player, second_throw)
+        self.state_default = State(self.game_board_default.copy(), self.score_default,
+                                   self.score_default, self.pieces_default.copy(),
+                                   self.pieces_default.copy(), 1, 2)
 
-    def add_state(self, state: State) -> State:
-        return self.sim.state_list.add_new_state(state)
-
-    def get_simulated_state(self, current_state: State) -> State:
-        return self.sim.state_list.get_next_child(current_state)
-
-    def test0(self):
-        """Player 1 and Player 2 are in home. Player 1 throw 0"""
-        current_player = 1
-        other_player = 2
+    def test0(self) -> None:
+        """No movement"""
+        piece_index = 0
         dice = 0
 
-        expected_place = START
+        current_state = self.state_default.copy()
 
-        state = self.state_default
-        state.current_player = current_player
-        state.other_player = other_player
+        expected_state = self.state_default.copy()
+        expected_state.swap_player()
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        simulated_step = self.get_simulated_state(current_state)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(simulated_step.game_board, self.game_board_default)
-        self.assertEqual(simulated_step.score_1, 0)
-        self.assertEqual(simulated_step.score_2, 0)
+        self.assertEqual(expected_state, state_new)
 
-        places_1_new = self.places_default.copy()
-        places_1_new[0] = expected_place
-        self.assertEqual(simulated_step.places_1, places_1_new)
-        self.assertEqual(simulated_step.places_2, self.places_default)
-
-        self.assertEqual(len(current_state.children), 1)
-
-    def test1(self):
-        """Player 1 and Player 2 are in home. Player 1 goes on game_board"""
-        current_player = 1
-        other_player = 2
+    def test1(self) -> None:
+        """Piece is already in finish, no movement => No new state"""
+        piece_index = 0
         dice = 1
 
-        expected_place = 3
+        current_state = self.state_default.copy()
+        current_state.pieces_1[piece_index] = PLACE_FINISH
 
-        state = self.state_default
-        state.current_player = current_player
-        state.other_player = other_player
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        simulated_step = self.get_simulated_state(current_state)
+        self.assertIsNone(state_new)
 
-        self.assertEqual(
-            simulated_step.game_board[expected_place] - self.game_board_default[expected_place],
-            current_player)
-        self.assertEqual(simulated_step.score_1, 0)
-        self.assertEqual(simulated_step.score_2, 0)
+    def test2(self) -> None:
+        """Piece cannot finish, dice is too high => No new state"""
+        piece_index = 0
+        dice = 3
 
-        places_1_new = self.places_default.copy()
-        places_1_new[0] = expected_place
-        self.assertEqual(simulated_step.places_1, places_1_new)
-        self.assertEqual(simulated_step.places_2, self.places_default)
+        current_state = self.state_default.copy()
+        current_state.game_board[5] += current_state.current_player
+        current_state.pieces_1[piece_index] = 5
 
-        changed_board = simulated_step.game_board.copy()
-        changed_board[expected_place] -= current_player
-        self.assertEqual(changed_board, self.game_board_default)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
+        self.assertIsNone(state_new)
 
-    def test2(self):
-        """Player 1 and Player 2 are in home. Player 2 goes on first Rosette and throw the dice again."""
-        MinimaxSimulation.throw_dices = mock.Mock(return_value=[3])
-
-        current_player = 2
-        other_player = 1
-        dice = 4
-
-        expected_place_first = 14
-
-        state = self.state_default
-        state.current_player = current_player
-        state.other_player = other_player
-
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        simulated_step = self.get_simulated_state(current_state)
-
-        # Evaluation first throw
-
-        self.assertTrue(simulated_step.second_throw)
-
-        self.assertEqual(simulated_step.game_board[expected_place_first] - self.game_board_default[
-            expected_place_first], current_player)
-        self.assertEqual(simulated_step.score_1, 0)
-        self.assertEqual(simulated_step.score_2, 0)
-
-        places_2_new = self.places_default.copy()
-        places_2_new[0] = expected_place_first
-        self.assertEqual(simulated_step.places_1, self.places_default)
-        self.assertEqual(simulated_step.places_2, places_2_new)
-
-        changed_board = simulated_step.game_board.copy()
-        changed_board[expected_place_first] -= current_player
-        self.assertEqual(changed_board, self.game_board_default)
-
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
-
-    def test3(self):
-        """Player 1 has one piece which goes directly into finish."""
-        current_player = 1
-        other_player = 2
+    def test3(self) -> None:
+        """Piece finishes"""
+        piece_index = 0
         dice = 2
 
-        expected_place = FINISH
+        current_state = self.state_default.copy()
+        current_state.game_board[5] += current_state.current_player
+        current_state.pieces_1[piece_index] = 5
 
-        state = dataclasses.replace(self.state_default)
-        state.game_board[5] += current_player
-        state.places_1[0] = 5
-        state.current_player = current_player
-        state.other_player = other_player
+        expected_state = self.state_default.copy()
+        expected_state.pieces_1[piece_index] = PLACE_FINISH
+        expected_state.swap_player()
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        simulated_step = self.get_simulated_state(current_state)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(simulated_step.game_board[5], self.game_board_default[5])
-        self.assertEqual(simulated_step.score_1, 1)
-        self.assertEqual(simulated_step.score_2, 0)
+        self.assertEqual(expected_state, state_new)
 
-        places_1_new = self.places_default.copy()
-        places_1_new[0] = expected_place
-        self.assertEqual(simulated_step.places_1, places_1_new)
-        self.assertEqual(simulated_step.places_2, self.places_default)
-
-        self.assertEqual(simulated_step.game_board, self.game_board_default)
-
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
-
-    def test4(self):
-        """Player 1 has one piece which would go one step further than finish."""
-        current_player = 1
-        other_player = 2
-        dice = 3
-
-        state = dataclasses.replace(self.state_default)
-        state.game_board[5] += current_player
-        state.places_1[0] = 5
-        state.current_player = current_player
-        state.other_player = other_player
-
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
-
-    def test5(self):
-        """Player 1 has one piece which is already in finish."""
-        current_player = 1
-        other_player = 2
-        dice = 3
-
-        state = dataclasses.replace(self.state_default)
-        state.places_1[0] = FINISH
-        state.current_player = current_player
-        state.other_player = other_player
-
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        self.get_simulated_state(current_state)
-
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
-
-    def test6(self):
-        """Player 1 tries to go on a field, where a piece of itself is laying."""
-        current_player = 1
-        other_player = 2
+    def test4(self) -> None:
+        """Piece cannot move, because same player is on this field => No new state"""
+        piece_index = 0
         dice = 1
 
-        state = dataclasses.replace(self.state_default)
-        state.game_board[1] += current_player
-        state.game_board[2] += current_player
-        state.places_1[0] = 2
-        state.places_1[1] = 1
-        state.current_player = current_player
-        state.other_player = other_player
+        current_state = self.state_default.copy()
+        current_state.game_board[3] += current_state.current_player
+        current_state.pieces_1[1] = 3
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
+        self.assertIsNone(state_new)
 
-    def test7(self):
-        """Player 1 tries to go on the middle Rosette, where a piece of player 2 is laying."""
-        current_player = 1
-        other_player = 2
+    def test5(self) -> None:
+        """Piece cannot be moved, because other player is on safe spot => No new state"""
+        piece_index = 0
         dice = 1
 
-        state = dataclasses.replace(self.state_default)
-        state.game_board[8] += current_player
-        state.game_board[9] += other_player
-        state.places_1[0] = 8
-        state.places_2[0] = 9
-        state.current_player = current_player
-        state.other_player = other_player
+        current_state = self.state_default.copy()
+        current_state.game_board[9] += current_state.other_player
+        current_state.pieces_2[0] = 9
+        current_state.game_board[8] += current_state.current_player
+        current_state.pieces_1[piece_index] = 8
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER - 1)
+        self.assertIsNone(state_new)
 
-    def test8(self):
-        """Player 1 goes on middle rosette and is not allowed to throw again."""
-        current_player = 1
-        other_player = 2
+    def test6(self) -> None:
+        """Normal move"""
+        piece_index = 0
         dice = 1
 
-        state = dataclasses.replace(self.state_default)
-        state.game_board[8] += current_player
-        state.places_1[0] = 8
-        state.current_player = current_player
-        state.other_player = other_player
+        current_state = self.state_default.copy()
+        current_state.game_board[6] += current_state.current_player
+        current_state.pieces_1[piece_index] = 6
 
-        expected_place = 9
+        expected_state = self.state_default.copy()
+        expected_state.game_board[7] += current_state.current_player
+        expected_state.pieces_1[piece_index] = 7
+        expected_state.swap_player()
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        simulated_step = self.get_simulated_state(current_state)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(
-            simulated_step.game_board[expected_place] - self.game_board_default[expected_place],
-            current_player)
-        self.assertEqual(simulated_step.score_1, 0)
-        self.assertEqual(simulated_step.score_2, 0)
+        self.assertEqual(expected_state, state_new)
 
-        places_1_new = self.places_default.copy()
-        places_1_new[0] = expected_place
-        self.assertEqual(simulated_step.places_1, places_1_new)
-        self.assertEqual(simulated_step.places_2, self.places_default)
-
-        changed_board = simulated_step.game_board.copy()
-        changed_board[expected_place] -= current_player
-        self.assertEqual(changed_board, self.game_board_default)
-
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
-
-    def test9(self):
-        """Player 1 catches a piece of player 2."""
-        current_player = 1
-        other_player = 2
+    def test7(self) -> None:
+        """Catch other player"""
+        piece_index = 0
         dice = 1
 
-        state = dataclasses.replace(self.state_default)
-        state.game_board[7] += current_player
-        state.game_board[8] += other_player
-        state.places_1[0] = 7
-        state.places_2[0] = 8
-        state.current_player = current_player
-        state.other_player = other_player
+        current_state = self.state_default.copy()
+        current_state.game_board[7] += current_state.current_player
+        current_state.pieces_1[piece_index] = 7
+        current_state.game_board[8] += current_state.other_player
+        current_state.pieces_2[0] = 8
 
-        expected_place_1 = 8
-        expected_place_2 = START
+        expected_state = self.state_default.copy()
+        expected_state.game_board[8] += current_state.current_player
+        expected_state.pieces_1[piece_index] = 8
+        expected_state.pieces_2[0] = PLACE_START
+        expected_state.swap_player()
 
-        current_state = self.add_state(state)
-        self.sim.simulate_step(current_state, dice)
-        simulated_step =self.get_simulated_state(current_state)
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
 
-        self.assertEqual(
-            simulated_step.game_board[expected_place_1] - self.game_board_default[expected_place_1],
-            current_player)
-        self.assertEqual(simulated_step.score_1, 0)
-        self.assertEqual(simulated_step.score_2, 0)
+        self.assertEqual(expected_state, state_new)
 
-        places_1_new = self.places_default.copy()
-        places_1_new[0] = expected_place_1
-        self.assertEqual(simulated_step.places_1, places_1_new)
-        places_2_new = self.places_default.copy()
-        places_2_new[0] = expected_place_2
-        self.assertEqual(simulated_step.places_2, places_2_new)
+    def test8(self) -> None:
+        """Move on Rosette field"""
+        piece_index = 0
+        dice = 1
 
-        changed_board = simulated_step.game_board.copy()
-        changed_board[8] -= current_player
-        self.assertEqual(changed_board, self.game_board_default)
+        current_state = self.state_default.copy()
+        current_state.game_board[1] += current_state.current_player
+        current_state.pieces_1[piece_index] = 1
 
-        self.assertEqual(len(current_state.children), NUM_OF_PIECES_PER_PLAYER)
+        expected_state = self.state_default.copy()
+        expected_state.game_board[0] += current_state.current_player
+        expected_state.pieces_1[piece_index] = 0
+        expected_state.second_throw = True
+
+        state_new = self.sim.simulate_step(current_state, piece_index, dice)
+
+        self.assertEqual(expected_state, state_new)
