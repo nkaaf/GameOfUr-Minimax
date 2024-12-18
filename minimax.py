@@ -188,14 +188,18 @@ class MinimaxSimulation:
         # Indices of game_board places for both players
         # -1 -> Start
         # -2 -> Finish
-        places_1 = places_2 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
+        pieces_1 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
+        pieces_2 =  [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
+
+        pieces_1[0] = 1
         # Number of pieces in finish for both players
-        score_1 = score_2 = 0
+        score_1 = 0
+        score_2 = 0
         # Start state
-        state = self.game_board
+        game_board = self.game_board
 
         self.start_state = self.state_list.add_new_state(
-            State(state, score_1, score_2, places_1, places_2, 1, 2))
+            State(game_board, score_1, score_2, pieces_1, pieces_2, 1, 2))
 
     def piece_cannot_finish(self, current_player: int, next_path_index: int) -> bool:
         path = self.paths[current_player]
