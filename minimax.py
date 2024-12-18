@@ -64,7 +64,7 @@ class State:
     current_player: int
     other_player: int
     second_throw: bool = field(default=False)
-    parent_pos: int = field(default=0)
+    parent_pos: Optional[int] = field(default=None)
     pos: int = field(init=False, default=-1)
     children: List[int] = field(init=False, default_factory=list)
     child_iter: int = field(init=False, default=-1)
@@ -93,6 +93,15 @@ class State:
                 f"\tBoard state: {self.game_board}\n"
                 f"\tPieces 1: {self.pieces_1} - Pieces 2: {self.pieces_2}\n"
                 f"\tScore 1: {self.score_1} - Score 2: {self.score_2}\n")
+
+    def check_win(self, player: int) -> None:
+        score_player = player_based_list(self.score_1, self.score_2)[player]
+
+        if score_player == NUM_OF_PIECES_PER_PLAYER:
+            # TODO: Was hier?
+            print_out("Win - Keine Ahnung was jetzt")
+            print("Win")
+            sys.exit(0)
 
     def swap_player(self) -> None:
         tmp = self.current_player
@@ -135,13 +144,6 @@ class StateList:
 
         assert 0 <= state.parent_pos <= len(self.states), "State's parent position is not valid!"
         return self.states[state.parent_pos]
-
-    def get_next_child_of_parent(self, state: State) -> Optional[State]:
-        parent = self.get_parent(state)
-        if parent is None:
-            return None
-
-        return self.get_next_child(parent)
 
     def get_next_child(self, state: State) -> Optional[State]:
         state.child_iter += 1
@@ -364,12 +366,6 @@ class MinimaxSimulation:
 
         return state_new
 
-    @staticmethod
-    def check_win(score_current_player: int):
-        if score_current_player == NUM_OF_PIECES_PER_PLAYER:
-            print_out("Win - Keine Ahnung was jetzt")
-            sys.exit(0)
-
     def visualize(self) -> None:
         graph = graphviz.Graph()
 
@@ -383,12 +379,11 @@ class MinimaxSimulation:
         graph.view()
 
     def start(self) -> None:
-        next_state = current_state = self.start_state
+        current_state = self.start_state
 
         current_step = START_STEP
 
-        while current_state is not None and next_state is not None:
-
+        while current_state is not None:
             for step in range(current_step, STEPS_IN_FUTURE):
                 print_out(f"Step: {step}")
                 print_out(f"Current state: \n{current_state}")
@@ -415,7 +410,12 @@ class MinimaxSimulation:
 
                         print_out(f"Simulated state: \n{state_new}")
 
+                # ----- Evaluate all created children ----- #
+
                 for child in [self.state_list.get(index) for index in current_state.children]:
+                    # Check if the player won, with this child
+                    child.check_win(current_state.current_player)
+
                     score = self.evaluation(child)
                     print_eval(f"{step},{score}")
                     child.eval = score
@@ -426,14 +426,10 @@ class MinimaxSimulation:
 
                     next_state = self.state_list.get_next_child(current_state)
 
-                    if next_state is not None:
-                        current_state = next_state
+                    # TODO: Korrekt?
+                    assert next_state is not None
 
-                    if current_state is not None:
-                        if current_state.current_player == 1:
-                            self.check_win(current_state.score_1)
-                        else:
-                            self.check_win(current_state.score_2)
+                    current_state = next_state
 
             current_step = STEPS_IN_FUTURE
 
