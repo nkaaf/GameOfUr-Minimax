@@ -63,8 +63,8 @@ class State:
     pieces_2: List[int]
     current_player: int
     other_player: int
-    second_throw: bool = field(default=False)
-    parent_pos: Optional[int] = field(default=None)
+    second_throw: bool = field(init=False, default=False)
+    parent_pos: Optional[int] = field(init=False, default=None)
     pos: int = field(init=False, default=-1)
     children: List[int] = field(init=False, default_factory=list)
     child_iter: int = field(init=False, default=-1)
@@ -78,11 +78,9 @@ class State:
         pieces_2 = self.pieces_2.copy()
         current_player = self.current_player
         other_player = self.other_player
-        second_throw = self.second_throw
-        parent_pos = self.parent_pos
 
         state = State(game_board, score_1, score_2, pieces_1, pieces_2, current_player,
-                      other_player, second_throw, parent_pos)
+                      other_player)
 
         return state
 
@@ -189,7 +187,7 @@ class MinimaxSimulation:
         # -1 -> Start
         # -2 -> Finish
         pieces_1 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
-        pieces_2 =  [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
+        pieces_2 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
 
         # Number of pieces in finish for both players
         score_1 = 0
@@ -415,17 +413,21 @@ class MinimaxSimulation:
                         state_new = self.state_list.add_new_state(state_new)
                         current_state.children.append(state_new.pos)
 
+                        # ----- Check win ----- #
+                        state_new.check_win(current_state.current_player)
+
+                        # ----- Evaluation ----- #
+                        score = self.evaluation(state_new)
+                        print_eval(f"{step},{score}")
+                        state_new.eval = score
+
                         print_out(f"Simulated state: \n{state_new}")
 
-                # ----- Evaluate all created children ----- #
+                    # ----- "Normalize" all evaluation scores of this piece ----- #
 
-                for child in [self.state_list.get(index) for index in current_state.children]:
-                    # Check if the player won, with this child
-                    child.check_win(current_state.current_player)
-
-                    score = self.evaluation(child)
-                    print_eval(f"{step},{score}")
-                    child.eval = score
+                    min_evaluation = min([self.state_list.get(index).eval for index in current_state.children])
+                    for child in [self.state_list.get(index) for index in current_state.children]:
+                        child.eval = min_evaluation
 
                 if step != STEPS_IN_FUTURE - 1:
                     # Get next child

@@ -1,9 +1,6 @@
-import dataclasses
 import unittest
-from typing import List
 
-from minimax import MinimaxSimulation, State, NUM_OF_PIECES_PER_PLAYER, PLACE_ROSETTE_SAFE, \
-    PLACE_START, PLACE_ROSETTE, PLACE_FINISH
+from minimax import MinimaxSimulation, State, NUM_OF_PIECES_PER_PLAYER, PLACE_START, PLACE_FINISH
 
 
 class MinimaxTest(unittest.TestCase):
@@ -15,9 +12,12 @@ class MinimaxTest(unittest.TestCase):
         self.score_default = 0
         self.pieces_default = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
 
+        self.current_player_default = 1
+        self.other_player_default = 2
+
         self.state_default = State(self.game_board_default.copy(), self.score_default,
                                    self.score_default, self.pieces_default.copy(),
-                                   self.pieces_default.copy(), 1, 2)
+                                   self.pieces_default.copy(), self.current_player_default, self.other_player_default)
 
     def test0(self) -> None:
         """No movement"""
