@@ -33,7 +33,7 @@ class ListIndexSafe(list):
 
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
-NUM_OF_PIECES_PER_PLAYER = 1
+NUM_OF_PIECES_PER_PLAYER = 2
 STEPS_IN_FUTURE = 2
 PLAYER_1_MIN = True
 VISUALIZE = True
@@ -44,14 +44,18 @@ START_STEP = 0
 EVAL_POINT_FINISH = 100
 EVAL_POINT_START = -5
 EVAL_MULTIPLIER_ROSETTE = 1.5
-EVAL_MULTIPLIER_KILLABLE = 1.5
+EVAL_MULTIPLIER_KILLABLE = 10
 EVAL_MULTIPLIER_ATTACKER = -1.5
+EVAL_ADDER_KILL_HAPPENS = 100
 
 # Constants
 PLACE_ROSETTE = 3
 PLACE_ROSETTE_SAFE = 6 if ROSETTE_9_IS_SAFE else PLACE_ROSETTE
 PLACE_START = -1
 PLACE_FINISH = -2
+
+# Visualization
+VIZ_THROWS = [2,3]
 
 
 @dataclass
@@ -63,6 +67,8 @@ class State:
     pieces_2: List[int]
     current_player: int
     other_player: int
+    dice: int = field(init=False, default=-1)
+    moved_piece: int = field(init=False, default=-1)
     second_throw: bool = field(init=False, default=False)
     parent_pos: Optional[int] = field(init=False, default=None)
     pos: int = field(init=False, default=-1)
@@ -81,13 +87,6 @@ class State:
 
         state = State(game_board, score_1, score_2, pieces_1, pieces_2, current_player,
                       other_player)
-
-        #state.second_throw = self.second_throw
-        #state.parent_pos = self.parent_pos
-        #state.pos = self.pos
-        #state.children = self.children.copy()
-        #state.child_iter = self.child_iter
-        #state.eval = self.eval
 
         return state
 
@@ -178,8 +177,8 @@ class MinimaxSimulation:
         # 3 -> Rosette (another throw)
         # 4 = 3 + 1 -> Player 1 on rosette
         # 5 = 3 + 2 -> Player 2 on rosette
-        self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 0, 0, 0, PLACE_ROSETTE_SAFE, 0,
-                           0, 0, 0, PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
+        self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
+                           PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
 
         # Indices of game_board path for both players
         self.path_1 = ListIndexSafe([3, 2, 1, 0, 6, 7, 8, 9, 10, 11, 12, 13, 5, 4])
@@ -194,7 +193,11 @@ class MinimaxSimulation:
         # -1 -> Start
         # -2 -> Finish
         pieces_1 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
+        pieces_1[0] = 6
+        pieces_1[1] = 10
+
         pieces_2 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
+        pieces_2[1] = 8
 
         # Number of pieces in finish for both players
         score_1 = 0
@@ -241,11 +244,17 @@ class MinimaxSimulation:
 
         return any([place == next_place_index for place in places_other_player])
 
-    def evaluation(self, state: State) -> float:
-        current_player = state.current_player
-        other_player = state.other_player
+    def evaluation(self, state_source: State, state_new: State) -> float:
+        # Simulation will swap the player if no second throw
+        # The evaluation should use the original "current_player" and "other_player"
+        if state_new.second_throw:
+            current_player = state_new.current_player
+            other_player = state_new.other_player
+        else:
+            current_player = state_new.other_player
+            other_player = state_new.current_player
 
-        places = player_based_list(state.pieces_1, state.pieces_2)
+        places = player_based_list(state_new.pieces_1, state_new.pieces_2)
         paths = player_based_list(self.path_1, self.path_2)
 
         places_current_player = places[current_player]
@@ -292,10 +301,25 @@ class MinimaxSimulation:
                 count_attacker = len(attacker_pieces_of_other_player)
                 points_total += count_attacker * EVAL_MULTIPLIER_ATTACKER
 
+        # ------------ Improvements of state ------------ #
+
+        other_pieces_source = player_based_list(state_source.pieces_1, state_source.pieces_2)[other_player]
+        other_pieces_new = player_based_list(state_new.pieces_1, state_new.pieces_2)[other_player]
+
+        count_other_pieces_source_start = sum([1 for a in other_pieces_source if a == PLACE_START])
+        count_other_pieces_new_start = sum([1 for a in other_pieces_new if a == PLACE_START])
+
+        kill_happens = count_other_pieces_new_start != count_other_pieces_source_start
+
+        points_total += kill_happens * EVAL_ADDER_KILL_HAPPENS
+
         return points_total
 
     def simulate_step(self, current_state: State, piece_index: int, dice: int) -> Optional[State]:
         # current_state is a copy of the current state and can therefore be modified
+
+        current_state.dice = dice
+        current_state.moved_piece = piece_index
 
         # Reset second throw
         current_state.second_throw = False
@@ -381,13 +405,48 @@ class MinimaxSimulation:
         graph = graphviz.Graph()
 
         for state in self.state_list:
-            color = "green" if state.current_player == 1 else "red"
-            graph.node(str(state.pos), f"{state.pos} - Score: {state.eval}", _attributes={"color": color})
+            if state.pos == 0:
+                current_player = 1
+            elif state.second_throw:
+                current_player = state.current_player
+            else:
+                current_player = state.other_player
+
+            color = "green" if current_player == 1 else "red"
+            graph.node(str(state.pos), f"{state.eval}\n{state.dice}\n{state.moved_piece}", _attributes={"color": color})
 
         for state in self.state_list:
             for child in state.children:
                 graph.edge(str(state.pos), str(child))
 
+        graph.view()
+
+    def visualize_path(self) -> None:
+        graph = graphviz.Graph(name="Graph2")
+
+        visualized_children = []
+
+        root = self.state_list.get(0)
+        visualized_children.append(root)
+        childs_step_1 = [self.state_list.get(child_pos) for child_pos in root.children  if self.state_list.get(child_pos).dice == VIZ_THROWS[0]]
+        visualized_children.extend(childs_step_1)
+        for child_1 in childs_step_1:
+            visualized_children.extend([self.state_list.get(child_pos) for child_pos in child_1.children  if self.state_list.get(child_pos).dice == VIZ_THROWS[1]])
+
+        for state in visualized_children:
+            if state.pos == 0:
+                current_player = 1
+            elif state.second_throw:
+                current_player = state.current_player
+            else:
+                current_player = state.other_player
+
+            color = "green" if current_player == 1 else "red"
+            graph.node(str(state.pos), f"{state.pos}\n{state.eval}\n{state.dice}\n{state.moved_piece}", _attributes={"color": color})
+
+        for state in visualized_children:
+            for child in state.children:
+                graph.edge(str(state.pos), str(child))
         graph.view()
 
     def start(self) -> None:
@@ -424,17 +483,19 @@ class MinimaxSimulation:
                         state_new.check_win(current_state.current_player)
 
                         # ----- Evaluation ----- #
-                        score = self.evaluation(state_new)
+                        score = self.evaluation(current_state, state_new)
                         print_eval(f"{step},{score}")
                         state_new.eval = score
 
                         print_out(f"Simulated state: \n{state_new}")
 
                     # ----- "Normalize" all evaluation scores of this piece ----- #
-
-                    min_evaluation = min([self.state_list.get(index).eval for index in current_state.children])
-                    for child in [self.state_list.get(index) for index in current_state.children]:
-                        child.eval = min_evaluation
+                    #if current_state.current_player == 1 and PLAYER_1_MIN:
+                    #    normalized_eval = min([self.state_list.get(index).eval for index in current_state.children])
+                    #else:
+                    #    normalized_eval = max([self.state_list.get(index).eval for index in current_state.children])
+                    #for child in [self.state_list.get(index) for index in current_state.children]:
+                    #   child.eval = normalized_eval
 
                 if len(current_state.children) == 0:
                     # No piece can move. This leads to no child, which would be incorrect. Therefore the same state will be the next state, but with player swap
@@ -470,6 +531,7 @@ class MinimaxSimulation:
 
         if VISUALIZE:
             self.visualize()
+            self.visualize_path()
 
 
 if __name__ == "__main__":
