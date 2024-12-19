@@ -33,10 +33,10 @@ class ListIndexSafe(list):
 
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
-NUM_OF_PIECES_PER_PLAYER = 5
-STEPS_IN_FUTURE = 8
+NUM_OF_PIECES_PER_PLAYER = 1
+STEPS_IN_FUTURE = 2
 PLAYER_1_MIN = True
-VISUALIZE = False
+VISUALIZE = True
 ROSETTE_9_IS_SAFE = True
 START_STEP = 0
 
@@ -191,7 +191,6 @@ class MinimaxSimulation:
         pieces_1 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
         pieces_2 =  [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
 
-        pieces_1[0] = 1
         # Number of pieces in finish for both players
         score_1 = 0
         score_2 = 0
@@ -293,6 +292,9 @@ class MinimaxSimulation:
     def simulate_step(self, current_state: State, piece_index: int, dice: int) -> Optional[State]:
         # current_state is a copy of the current state and can therefore be modified
 
+        # Reset second throw
+        current_state.second_throw = False
+
         current_player = current_state.current_player
         other_player = current_state.other_player
 
@@ -374,7 +376,8 @@ class MinimaxSimulation:
         graph = graphviz.Graph()
 
         for state in self.state_list:
-            graph.node(str(state.pos), f"{state.pos} - Score: {state.eval}")
+            color = "green" if state.current_player == 1 else "red"
+            graph.node(str(state.pos), f"{state.pos} - Score: {state.eval}", _attributes={"color": color})
 
         for state in self.state_list:
             for child in state.children:
