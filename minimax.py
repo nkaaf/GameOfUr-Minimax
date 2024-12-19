@@ -33,7 +33,7 @@ class ListIndexSafe(list):
 
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
-NUM_OF_PIECES_PER_PLAYER = 2
+NUM_OF_PIECES_PER_PLAYER = 5
 STEPS_IN_FUTURE = 2
 PLAYER_1_MIN = True
 VISUALIZE = True
@@ -177,7 +177,9 @@ class MinimaxSimulation:
         # 3 -> Rosette (another throw)
         # 4 = 3 + 1 -> Player 1 on rosette
         # 5 = 3 + 2 -> Player 2 on rosette
-        self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
+        #self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
+        #                   PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
+        self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 0, 0, 0, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
                            PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
 
         # Indices of game_board path for both players
@@ -193,11 +195,11 @@ class MinimaxSimulation:
         # -1 -> Start
         # -2 -> Finish
         pieces_1 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
-        pieces_1[0] = 6
-        pieces_1[1] = 10
+        #pieces_1[0] = 6
+        #pieces_1[1] = 10
 
         pieces_2 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
-        pieces_2[1] = 8
+        #pieces_2[1] = 8
 
         # Number of pieces in finish for both players
         score_1 = 0
