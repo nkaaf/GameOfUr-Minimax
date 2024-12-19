@@ -82,6 +82,13 @@ class State:
         state = State(game_board, score_1, score_2, pieces_1, pieces_2, current_player,
                       other_player)
 
+        #state.second_throw = self.second_throw
+        #state.parent_pos = self.parent_pos
+        #state.pos = self.pos
+        #state.children = self.children.copy()
+        #state.child_iter = self.child_iter
+        #state.eval = self.eval
+
         return state
 
     def __str__(self) -> str:
@@ -428,6 +435,16 @@ class MinimaxSimulation:
                     min_evaluation = min([self.state_list.get(index).eval for index in current_state.children])
                     for child in [self.state_list.get(index) for index in current_state.children]:
                         child.eval = min_evaluation
+
+                if len(current_state.children) == 0:
+                    # No piece can move. This leads to no child, which would be incorrect. Therefore the same state will be the next state, but with player swap
+                    # TODO: what should evalulation score be?
+                    state_new = current_state.copy()
+                    state_new.swap_player()
+
+                    state_new.parent_pos = current_state.pos
+                    state_new = self.state_list.add_new_state(state_new)
+                    current_state.children.append(state_new.pos)
 
                 if step != STEPS_IN_FUTURE - 1:
                     # Get next child
