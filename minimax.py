@@ -55,7 +55,7 @@ PLACE_START = -1
 PLACE_FINISH = -2
 
 # Visualization
-VIZ_THROWS = [2,3]
+VIZ_THROWS = [2, 3]
 
 
 @dataclass
@@ -177,10 +177,10 @@ class MinimaxSimulation:
         # 3 -> Rosette (another throw)
         # 4 = 3 + 1 -> Player 1 on rosette
         # 5 = 3 + 2 -> Player 2 on rosette
-        #self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
-        #                   PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
         self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 0, 0, 0, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
                            PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
+        #self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
+        #                   PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
 
         # Indices of game_board path for both players
         self.path_1 = ListIndexSafe([3, 2, 1, 0, 6, 7, 8, 9, 10, 11, 12, 13, 5, 4])
@@ -404,7 +404,7 @@ class MinimaxSimulation:
         return state_new
 
     def visualize(self) -> None:
-        graph = graphviz.Graph()
+        graph = graphviz.Graph(name="Graph")
 
         for state in self.state_list:
             if state.pos == 0:
@@ -424,31 +424,39 @@ class MinimaxSimulation:
         graph.view()
 
     def visualize_path(self) -> None:
-        graph = graphviz.Graph(name="Graph2")
+        graph = graphviz.Graph(name="Graph_Path")
 
-        visualized_children = []
+        root_node = self.state_list.get(0)
 
-        root = self.state_list.get(0)
-        visualized_children.append(root)
-        childs_step_1 = [self.state_list.get(child_pos) for child_pos in root.children  if self.state_list.get(child_pos).dice == VIZ_THROWS[0]]
-        visualized_children.extend(childs_step_1)
-        for child_1 in childs_step_1:
-            visualized_children.extend([self.state_list.get(child_pos) for child_pos in child_1.children  if self.state_list.get(child_pos).dice == VIZ_THROWS[1]])
+        nodes_to_visualize = [root_node]
 
-        for state in visualized_children:
-            if state.pos == 0:
+        current_nodes = [root_node]
+        for throw in VIZ_THROWS:
+            new_nodes = []
+            for current_node in current_nodes:
+                children = [self.state_list.get(child) for child in current_node.children]
+                children_with_throw = [child for child in children if child.dice == throw]
+                nodes_to_visualize.extend(children_with_throw)
+                new_nodes.extend(children_with_throw)
+
+            current_nodes = new_nodes
+
+        for node in nodes_to_visualize:
+            if node.pos == 0:
                 current_player = 1
-            elif state.second_throw:
-                current_player = state.current_player
+            elif node.second_throw:
+                current_player = node.current_player
             else:
-                current_player = state.other_player
+                current_player = node.other_player
 
             color = "green" if current_player == 1 else "red"
-            graph.node(str(state.pos), f"{state.pos}\n{state.eval}\n{state.dice}\n{state.moved_piece}", _attributes={"color": color})
+            graph.node(str(node.pos), f"P: {node.pos}\nS: {node.eval}\nD: {node.dice}\nMP: {node.moved_piece}",
+                       _attributes={"color": color})
 
-        for state in visualized_children:
+        for state in nodes_to_visualize:
             for child in state.children:
-                graph.edge(str(state.pos), str(child))
+                if child in [node.pos for node in nodes_to_visualize]:
+                    graph.edge(str(state.pos), str(child))
         graph.view()
 
     def start(self) -> None:
@@ -492,11 +500,11 @@ class MinimaxSimulation:
                         print_out(f"Simulated state: \n{state_new}")
 
                     # ----- "Normalize" all evaluation scores of this piece ----- #
-                    #if current_state.current_player == 1 and PLAYER_1_MIN:
+                    # if current_state.current_player == 1 and PLAYER_1_MIN:
                     #    normalized_eval = min([self.state_list.get(index).eval for index in current_state.children])
-                    #else:
+                    # else:
                     #    normalized_eval = max([self.state_list.get(index).eval for index in current_state.children])
-                    #for child in [self.state_list.get(index) for index in current_state.children]:
+                    # for child in [self.state_list.get(index) for index in current_state.children]:
                     #   child.eval = normalized_eval
 
                 if len(current_state.children) == 0:
