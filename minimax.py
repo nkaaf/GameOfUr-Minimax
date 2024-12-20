@@ -450,7 +450,7 @@ class MinimaxSimulation:
                 current_player = node.other_player
 
             color = "green" if current_player == 1 else "red"
-            graph.node(str(node.pos), f"P: {node.pos}\nS: {node.eval}\nD: {node.dice}\nMP: {node.moved_piece}",
+            graph.node(str(node.pos), f"ID: {node.pos}\nS: {node.eval}\nD: {node.dice}\nMP: {node.moved_piece}",
                        _attributes={"color": color})
 
         for state in nodes_to_visualize:
