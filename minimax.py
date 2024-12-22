@@ -1,26 +1,53 @@
+import logging
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional, List
 
 import graphviz
 
-output_file = Path() / "output.txt"
-output_file.open("w").write("")
-output_file_eval = Path() / "output_eval.txt"
-output_file_eval.open("w").write("")
+# ----- User parameters ----- #
+
+# Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
+# Rules from Tom Scott vs. Finkel
+NUM_OF_PIECES_PER_PLAYER = 5
+STEPS_IN_FUTURE = 2
+PLAYER_1_MIN = True
+ROSETTE_9_IS_SAFE = True
+
+# Evaluation hyperparameter
+EVAL_POINT_FINISH = 100
+EVAL_POINT_START = -5
+EVAL_MULTIPLIER_ROSETTE = 1.5
+EVAL_MULTIPLIER_KILLABLE = 10
+EVAL_MULTIPLIER_ATTACKER = -1.5
+EVAL_ADDER_KILL_HAPPENS = 100
+
+# Visualization
+VISUALIZE = True
+VIZ_THROWS = [2, 3]
+
+# ----- Constants ----- #
+
+PLACE_ROSETTE = 3
+PLACE_ROSETTE_SAFE = 6 if ROSETTE_9_IS_SAFE else PLACE_ROSETTE
+PLACE_START = -1
+PLACE_FINISH = -2
 
 
-def print_out(text="") -> None:
-    text = str(text)
-    text += "\n"
-    output_file.open("a").write(text)
+def _get_file_handler(filename: str) -> logging.FileHandler:
+    handler = logging.FileHandler(filename, mode="w")
+    formatter = logging.Formatter("%(message)s")
+    handler.setFormatter(formatter)
+    return handler
 
 
-def print_eval(text="") -> None:
-    text = str(text)
-    text += "\n"
-    output_file_eval.open("a").write(text)
+logger_out = logging.getLogger("Minimax-Out")
+logger_out.addHandler(_get_file_handler("out.txt"))
+logger_out.setLevel(logging.INFO)
+
+logger_eval = logging.getLogger("Minimax-Eval")
+logger_eval.addHandler(_get_file_handler("out_eval.txt"))
+logger_eval.setLevel(logging.INFO)
 
 
 class ListIndexSafe(list):
@@ -29,33 +56,6 @@ class ListIndexSafe(list):
             return self.index(*args, **kwargs)
         except ValueError:
             return -1
-
-
-# Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
-# Rules from Tom Scott vs. Finkel
-NUM_OF_PIECES_PER_PLAYER = 5
-STEPS_IN_FUTURE = 2
-PLAYER_1_MIN = True
-VISUALIZE = True
-ROSETTE_9_IS_SAFE = True
-START_STEP = 0
-
-# Hyperparameter Bewertung
-EVAL_POINT_FINISH = 100
-EVAL_POINT_START = -5
-EVAL_MULTIPLIER_ROSETTE = 1.5
-EVAL_MULTIPLIER_KILLABLE = 10
-EVAL_MULTIPLIER_ATTACKER = -1.5
-EVAL_ADDER_KILL_HAPPENS = 100
-
-# Constants
-PLACE_ROSETTE = 3
-PLACE_ROSETTE_SAFE = 6 if ROSETTE_9_IS_SAFE else PLACE_ROSETTE
-PLACE_START = -1
-PLACE_FINISH = -2
-
-# Visualization
-VIZ_THROWS = [2, 3]
 
 
 @dataclass
@@ -103,8 +103,7 @@ class State:
 
         if score_player == NUM_OF_PIECES_PER_PLAYER:
             # TODO: Was hier?
-            print_out("Win - Keine Ahnung was jetzt")
-            print("Win")
+            logger_out.info("Win - Keine Ahnung was jetzt")
             sys.exit(0)
 
     def swap_player(self) -> None:
@@ -179,7 +178,7 @@ class MinimaxSimulation:
         # 5 = 3 + 2 -> Player 2 on rosette
         self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 0, 0, 0, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
                            PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
-        #self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
+        # self.game_board = [PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0, 1, 0, 2, PLACE_ROSETTE_SAFE, 1, 0, 0, 0,
         #                   PLACE_ROSETTE, 0, 0, 0, PLACE_ROSETTE, 0]
 
         # Indices of game_board path for both players
@@ -195,11 +194,11 @@ class MinimaxSimulation:
         # -1 -> Start
         # -2 -> Finish
         pieces_1 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
-        #pieces_1[0] = 6
-        #pieces_1[1] = 10
+        # pieces_1[0] = 6
+        # pieces_1[1] = 10
 
         pieces_2 = [PLACE_START] * NUM_OF_PIECES_PER_PLAYER
-        #pieces_2[1] = 8
+        # pieces_2[1] = 8
 
         # Number of pieces in finish for both players
         score_1 = 0
@@ -462,27 +461,27 @@ class MinimaxSimulation:
     def start(self) -> None:
         current_state = self.start_state
 
-        current_step = START_STEP
+        current_step = 0
 
         while current_state is not None:
             for step in range(current_step, STEPS_IN_FUTURE):
-                print_out(f"Step: {step}")
-                print_out(f"Current state: \n{current_state}")
+                logger_out.info(f"Step: {step}")
+                logger_out.info(f"Current state: \n{current_state}")
 
                 # ----- For each piece of current player ----- #
 
                 for piece_index in range(0, NUM_OF_PIECES_PER_PLAYER):
-                    print_out(f"Simulate piece '{piece_index}'")
+                    logger_out.info(f"Simulate piece '{piece_index}'")
 
                     # ----- For each possible dice throw ----- #
 
                     for dice in range(0, 4 + 1):
-                        print_out(f"Simulate dice '{dice}'")
+                        logger_out.info(f"Simulate dice '{dice}'")
 
                         state_new = self.simulate_step(current_state.copy(), piece_index, dice)
 
                         if state_new is None:
-                            print_out("Movement not possible")
+                            logger_out.info("Movement not possible")
                             continue
 
                         state_new.parent_pos = current_state.pos
@@ -494,10 +493,10 @@ class MinimaxSimulation:
 
                         # ----- Evaluation ----- #
                         score = self.evaluation(current_state, state_new)
-                        print_eval(f"{step},{score}")
+                        logger_eval.info(f"{step},{score}")
                         state_new.eval = score
 
-                        print_out(f"Simulated state: \n{state_new}")
+                        logger_out.info(f"Simulated state: \n{state_new}")
 
                     # ----- "Normalize" all evaluation scores of this piece ----- #
                     # if current_state.current_player == 1 and PLAYER_1_MIN:
