@@ -119,8 +119,8 @@ class State:
                 f"\tPieces 1: {self.pieces_1} - Pieces 2: {self.pieces_2}\n"
                 f"\tScore 1: {self.score_1} - Score 2: {self.score_2}\n")
 
-    def check_win(self, player: int) -> None:
-        score_player = player_based_list(self.score_1, self.score_2)[player]
+    def check_win(self) -> None:
+        score_player = player_based_list(self.score_1, self.score_2)[self.current_player]
 
         if score_player == NUM_OF_PIECES_PER_PLAYER:
             # TODO: Was hier?
@@ -504,7 +504,7 @@ class MinimaxSimulation:
                         current_state.children.append(state_new.pos)
 
                         # ----- Check win ----- #
-                        state_new.check_win(current_state.current_player)
+                        state_new.check_win()
 
                         # ----- Evaluation ----- #
                         score = self.evaluation(current_state, state_new)
