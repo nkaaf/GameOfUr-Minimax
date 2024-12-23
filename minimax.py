@@ -31,6 +31,7 @@ VIZ_THROWS = [4,4,4,0,3]
 PLACE_FINISH = numpy.uint8(0)
 PLACE_START = numpy.uint8(1)
 NUM_OF_PIECES_PER_PLAYER = 5
+assert NUM_OF_PIECES_PER_PLAYER <= int(32 / 4)
 MASK_PIECE_0 = numpy.uint32(0xF)
 MASK_PIECE_1 = numpy.uint32(MASK_PIECE_0 << 4)
 MASK_PIECE_2 = numpy.uint32(MASK_PIECE_1 << 4)
@@ -199,23 +200,27 @@ def piece_can_finish(current_pos: int, dice: int) -> bool:
     return current_pos + dice == 16
 
 
+def get_place_of_piece(pieces: numpy.uint32, piece_index: int) -> numpy.uint8:
+    return (pieces & get_piece_mask(piece_index)) >> (4 * piece_index)
+
+
 def any_piece_on_field(pieces: numpy.uint32, pos: int) -> Tuple[bool, Optional[int]]:
     ret_flag = False
     piece_index = None
 
-    if pieces & MASK_PIECE_0 == pos:
+    if get_place_of_piece(pieces, 0) == pos:
         piece_index = 0
         ret_flag = True
-    elif (pieces & MASK_PIECE_1) >> (4 * 1) == pos:
+    elif get_place_of_piece(pieces, 1) == pos:
         piece_index = 1
         ret_flag = True
-    elif (pieces & MASK_PIECE_2) >> (4 * 2) == pos:
+    elif get_place_of_piece(pieces, 2) == pos:
         piece_index = 2
         ret_flag = True
-    elif (pieces & MASK_PIECE_3) >> (4 * 3) == pos:
+    elif get_place_of_piece(pieces, 3) == pos:
         piece_index = 3
         ret_flag = True
-    elif (pieces & MASK_PIECE_4) >> (4 * 4) == pos:
+    elif get_place_of_piece(pieces, 4) == pos:
         piece_index = 4
         ret_flag = True
 
@@ -253,11 +258,9 @@ def other_player_is_on_field(current_state: State, current_pos: int) -> Tuple[bo
 
 class MinimaxSimulation:
     # evaluation
-    base_points = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, EVAL_POINT_FINISH,
-                   EVAL_POINT_START]
+    base_points = [EVAL_POINT_FINISH, EVAL_POINT_START, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     rosette_bonus = [value * EVAL_MULTIPLIER_ROSETTE for value in
-                     [1 / 16, 1 / 4, 3 / 8, 1, 1 / 16, 1 / 4, 3 / 8, 1, 0, 1 / 16, 1 / 4, 3 / 8, 1,
-                      0, 0]]
+                     [0, 0, 1 / 16, 1 / 4, 3 / 8, 1, 1 / 16, 1 / 4, 3 / 8, 1, 0, 0, 1 / 16, 1 / 4, 3 / 8, 1]]
     kill_distances_multiplier = [None, 1 / 4, 3 / 8, 1 / 4, 1 / 16]
 
     def __init__(self) -> None:
@@ -278,73 +281,59 @@ class MinimaxSimulation:
         self.start_state = self.state_list.add_new_state(
             State(score_1, score_2, pieces_1, pieces_2, 1, 2))
 
-    def evaluation(self, state_source: State, state_new: State) -> float:
+    @classmethod
+    def evaluation(cls, state_source: State, state_new: State) -> float:
         # Simulation will swap the player if no second throw
         # The evaluation should use the original "current_player" and "other_player"
-        if state_new.second_throw:
-            current_player = state_new.current_player
-            other_player = state_new.other_player
-        else:
-            current_player = state_new.other_player
-            other_player = state_new.current_player
+        current_player = state_new.current_player if state_new.second_throw else state_new.other_player
+        other_player = state_new.other_player if state_new.second_throw else state_new.current_player
 
-        places = player_based_list(state_new.pieces_1, state_new.pieces_2)
-        paths = player_based_list(self.path_1, self.path_2)
+        pieces = player_based_list(state_new.pieces_1, state_new.pieces_2)
 
-        places_current_player = places[current_player]
-        places_other_player = places[other_player]
-
-        paths_current_player = paths[current_player]
-        paths_other_player = paths[other_player]
+        pieces_current_player = pieces[current_player]
+        pieces_other_player = pieces[other_player]
 
         points_total = 0
-        for piece_place_current in places_current_player:
 
-            if piece_place_current in [PLACE_START, PLACE_FINISH]:
-                path_index_current = piece_place_current
-            else:
-                path_index_current = paths_current_player.index(piece_place_current)
+        for piece_index in range(0, NUM_OF_PIECES_PER_PLAYER):
+            piece_place = get_place_of_piece(pieces_current_player, piece_index)
 
-            # self.path_points + (self.rosette_multiplier * POINT_ROSETTE_MULTIPLIER)
-            # ==
-            # self.path_points + self.rosette_bonus
-            points_total += MinimaxSimulation.base_points[path_index_current] + \
-                            MinimaxSimulation.rosette_bonus[path_index_current]
+            # Base points
+            points_total += cls.base_points[piece_place]
+            # Rosette Bonus
+            points_total += cls.rosette_bonus[piece_place]
 
-            if path_index_current in [PLACE_START, PLACE_FINISH]:
+            if piece_place in [PLACE_START, 14, 15, PLACE_FINISH]:
+                # These pieces cannot kill any piece of other player and cannot be killed by other player
+
                 continue
 
-            # Killable
+            # Kill other player
 
-            path_kill_range = paths_current_player[path_index_current:path_index_current + 4]
-            killable_pieces_of_other_player = [piece_place_other for piece_place_other in
-                                               places_other_player if
-                                               piece_place_other in path_kill_range]
-            count_killable = len(killable_pieces_of_other_player)
-            points_total += count_killable * EVAL_MULTIPLIER_KILLABLE
+            count_killable_pieces_of_other_player = len(
+                [1 for i in range(1, 4 + 1) if any_piece_on_field(pieces_other_player, piece_place + i)])
+            points_total += count_killable_pieces_of_other_player * EVAL_MULTIPLIER_KILLABLE
 
-            # Attackers
+            # Killed by other player
 
-            if 6 <= piece_place_current <= 13:
-                # Beispiel: piece_place_current == 8
-                # path_attacker_range == [15, 14, 6, 7]
-                path_attacker_range = paths_other_player[path_index_current - 4:path_index_current]
-                attacker_pieces_of_other_player = [piece_place_other for piece_place_other in
-                                                   places_other_player if
-                                                   piece_place_other in path_attacker_range]
-                count_attacker = len(attacker_pieces_of_other_player)
-                points_total += count_attacker * EVAL_MULTIPLIER_ATTACKER
+            if 6 <= piece_place:
+                count_attacker_pieces_of_other_player = len(
+                    [1 for i in range(1, 4 + 1) if any_piece_on_field(pieces_other_player, piece_place - i)])
+                points_total += count_attacker_pieces_of_other_player * EVAL_MULTIPLIER_ATTACKER
 
         # ------------ Improvements of state ------------ #
 
         other_pieces_source = player_based_list(state_source.pieces_1, state_source.pieces_2)[other_player]
         other_pieces_new = player_based_list(state_new.pieces_1, state_new.pieces_2)[other_player]
 
-        count_other_pieces_source_start = sum([1 for a in other_pieces_source if a == PLACE_START])
-        count_other_pieces_new_start = sum([1 for a in other_pieces_new if a == PLACE_START])
+        count_other_pieces_source_start = len([1 for i in range(0, NUM_OF_PIECES_PER_PLAYER) if
+                                               get_place_of_piece(other_pieces_source, i) == PLACE_START])
+        count_other_pieces_new_start = len(
+            [1 for i in range(0, NUM_OF_PIECES_PER_PLAYER) if get_place_of_piece(other_pieces_new, i) == PLACE_START])
 
         kill_happens = count_other_pieces_new_start != count_other_pieces_source_start
 
+        # Kill happens
         points_total += kill_happens * EVAL_ADDER_KILL_HAPPENS
 
         return points_total
@@ -365,7 +354,7 @@ class MinimaxSimulation:
         pieces_current_player = player_based_list(current_state.pieces_1, current_state.pieces_2)[
             current_player]
 
-        place_current_piece = (pieces_current_player & get_piece_mask(piece_index)) >> (4 *piece_index)
+        place_current_piece = get_place_of_piece(pieces_current_player, piece_index)
 
         if dice == 0:
             # No movement
@@ -518,9 +507,9 @@ class MinimaxSimulation:
                         state_new.check_win(current_state.current_player)
 
                         # ----- Evaluation ----- #
-                        # score = self.evaluation(current_state, state_new)
-                        # logger_eval.info(f"{step},{score}")
-                        # state_new.eval = score
+                        score = self.evaluation(current_state, state_new)
+                        logger_eval.info(f"{step},{score}")
+                        state_new.eval = score
 
                         logger_out.info(f"Simulated state: \n{state_new}")
 
@@ -573,6 +562,7 @@ class MinimaxSimulation:
 
 if __name__ == "__main__":
     import datetime
+
     print(datetime.datetime.now())
     simulation = MinimaxSimulation()
     simulation.start()
