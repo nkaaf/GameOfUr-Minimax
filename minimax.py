@@ -24,7 +24,7 @@ EVAL_ADDER_KILL_HAPPENS = 100
 
 # Visualization
 VISUALIZE = False
-VIZ_THROWS = [2, 3]
+VIZ_THROWS = [4,4,4,0,3]
 
 # ----- Constants ----- #
 
@@ -36,8 +36,8 @@ MASK_PIECE_1 = numpy.uint32(MASK_PIECE_0 << 4)
 MASK_PIECE_2 = numpy.uint32(MASK_PIECE_1 << 4)
 MASK_PIECE_3 = numpy.uint32(MASK_PIECE_2 << 4)
 MASK_PIECE_4 = numpy.uint32(MASK_PIECE_3 << 4)
-ROSETTE_SAFE = 0x9
-ROSETTES = [5, 15]
+ROSETTE_SAFE = 9
+ROSETTES = [5, ROSETTE_SAFE, 15]
 
 
 def _get_file_handler(filename: str) -> logging.FileHandler:
@@ -413,11 +413,13 @@ class MinimaxSimulation:
                 # Other player will be caught and returned to start
                 current_state.piece_move(other_player, piece_index_other_player, PLACE_START)
 
-            if place_current_piece in ROSETTES:
+            next_place = place_current_piece + dice
+
+            if next_place in ROSETTES:
                 current_state.second_throw = True
 
             # current player moves from current place to new place
-            current_state.piece_move(current_player, piece_index, place_current_piece + dice)
+            current_state.piece_move(current_player, piece_index, next_place)
 
             state_new = current_state
 
@@ -438,7 +440,7 @@ class MinimaxSimulation:
                 current_player = state.other_player
 
             color = "green" if current_player == 1 else "red"
-            graph.node(str(state.pos), f"ID: {state.pos}\nS: {state.eval}\nD: {state.dice}\nMP: {state.moved_piece}",
+            graph.node(str(state.pos), f"ID: {state.pos}\nE: {state.eval}\nD: {state.dice}\nMP: {state.moved_piece}",
                        _attributes={"color": color})
         for state in self.state_list:
             for child in state.children:
@@ -473,7 +475,7 @@ class MinimaxSimulation:
                 current_player = node.other_player
 
             color = "green" if current_player == 1 else "red"
-            graph.node(str(node.pos), f"ID: {node.pos}\nS: {node.eval}\nD: {node.dice}\nMP: {node.moved_piece}",
+            graph.node(str(node.pos), f"ID: {node.pos}\nE: {node.eval}\nD: {node.dice}\nMP: {node.moved_piece}",
                        _attributes={"color": color})
 
         for state in nodes_to_visualize:

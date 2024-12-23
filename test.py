@@ -169,11 +169,11 @@ class MinimaxTest(unittest.TestCase):
         current_state = self.state_default.copy()
         piece_mask_clear = ~get_piece_mask(piece_index)
         current_state.pieces_1 &= piece_mask_clear
-        current_state.pieces_1 |= numpy.uint32(5) << (4 * piece_index)
+        current_state.pieces_1 |= numpy.uint32(4) << (4 * piece_index)
 
         expected_state = self.state_default.copy()
         expected_state.pieces_1 &= piece_mask_clear
-        expected_state.pieces_1 |= numpy.uint32(6) << (4 * piece_index)
+        expected_state.pieces_1 |= numpy.uint32(5) << (4 * piece_index)
         expected_state.dice = dice
         expected_state.moved_piece = piece_index
         expected_state.second_throw = True
