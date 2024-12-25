@@ -11,7 +11,8 @@ class MinimaxTest(unittest.TestCase):
         self.sim = MinimaxSimulation()
 
         self.score_default = 0
-        self.pieces_default = numpy.uint32(PLACE_START)
+        self.pieces_default = numpy.uint32(PLACE_START) | numpy.uint32(PLACE_START) << (4 * 1) | numpy.uint32(PLACE_START) << (
+                4 * 2) | numpy.uint32(PLACE_START) << (4 * 3) | numpy.uint32(PLACE_START) << (4 * 4)
 
         self.current_player_default = 1
         self.other_player_default = 2

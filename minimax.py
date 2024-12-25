@@ -10,7 +10,7 @@ import numpy
 
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
-STEPS_IN_FUTURE = 5
+STEPS_IN_FUTURE = 2
 PLAYER_1_MIN = True
 ROSETTE_9_IS_SAFE = True
 
@@ -23,8 +23,8 @@ EVAL_MULTIPLIER_ATTACKER = -1.5
 EVAL_ADDER_KILL_HAPPENS = 100
 
 # Visualization
-VISUALIZE = False
-VIZ_THROWS = [4,4,4,0,3]
+VISUALIZE = True
+VIZ_THROWS = [4, 4, 4, 0, 3]
 
 # ----- Constants ----- #
 
@@ -311,14 +311,14 @@ class MinimaxSimulation:
             # Kill other player
 
             count_killable_pieces_of_other_player = len(
-                [1 for i in range(1, 4 + 1) if any_piece_on_field(pieces_other_player, piece_place + i)])
+                [1 for i in range(1, 4 + 1) if any_piece_on_field(pieces_other_player, piece_place + i)[0]])
             points_total += count_killable_pieces_of_other_player * EVAL_MULTIPLIER_KILLABLE
 
             # Killed by other player
 
             if 6 <= piece_place:
                 count_attacker_pieces_of_other_player = len(
-                    [1 for i in range(1, 4 + 1) if any_piece_on_field(pieces_other_player, piece_place - i)])
+                    [1 for i in range(1, 4 + 1) if any_piece_on_field(pieces_other_player, piece_place - i)[0]])
                 points_total += count_attacker_pieces_of_other_player * EVAL_MULTIPLIER_ATTACKER
 
         # ------------ Improvements of state ------------ #
@@ -534,13 +534,7 @@ class MinimaxSimulation:
                 if step != STEPS_IN_FUTURE - 1:
                     # Get next child
                     # Only do this, if it is not the last step
-
-                    next_state = self.state_list.get_next_child(current_state)
-
-                    # TODO: Korrekt?
-                    assert next_state is not None
-
-                    current_state = next_state
+                    current_state = self.state_list.get_next_child(current_state)
 
             current_step = STEPS_IN_FUTURE
 
@@ -553,11 +547,11 @@ class MinimaxSimulation:
                     next_state = self.state_list.get_next_child(current_state)
             current_state = next_state
 
+        print(len(self.state_list))
+
         if VISUALIZE:
             self.visualize()
             self.visualize_path()
-
-        print(len(self.state_list))
 
 
 if __name__ == "__main__":
