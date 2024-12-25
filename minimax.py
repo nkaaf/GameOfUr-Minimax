@@ -10,7 +10,7 @@ import numpy
 
 # Rules: https://www.mastersofgames.com/rules/royal-ur-rules.htm
 # Rules from Tom Scott vs. Finkel
-STEPS_IN_FUTURE = 2
+STEPS_IN_FUTURE = 5
 PLAYER_1_MIN = True
 ROSETTE_9_IS_SAFE = True
 
@@ -23,8 +23,8 @@ EVAL_MULTIPLIER_ATTACKER = -1.5
 EVAL_ADDER_KILL_HAPPENS = 100
 
 # Visualization
-VISUALIZE = True
-VIZ_THROWS = [4, 4, 4, 0, 3]
+VISUALIZE = False
+VIZ_THROWS = [1, 1, 1, 0, 3]
 
 # ----- Constants ----- #
 
@@ -359,6 +359,7 @@ class MinimaxSimulation:
         if dice == 0:
             # No movement
 
+            current_state.moved_piece = -1 # No piece was moved
             state_new = current_state
 
         elif place_current_piece == PLACE_FINISH:
